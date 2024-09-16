@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true,
-        select : false,
+        select: false,
         validate: {
             validator: function (v) {
                 return v.length >= 6;
@@ -29,8 +29,24 @@ const userSchema = new mongoose.Schema({
         }
     },
     profilePicture: {
-        type: String,
-        default: '',
+        publicId: {
+            type: String,
+            default: '',
+        },
+        url: {
+            type: String,
+            default: '',
+        },
+    },
+    coverPicture: {
+        publicId: {
+            type: String,
+            default: '',
+        },
+        url: {
+            type: String,
+            default: '',
+        },
     },
     bio: {
         type: String,

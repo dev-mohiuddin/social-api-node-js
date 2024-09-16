@@ -1,3 +1,4 @@
+import fs from 'fs';
 import httpError from '../utils/httpError.js';
 import httpResponse from '../utils/httpResponse.js'
 import userError from '../utils/userError.js';
@@ -7,12 +8,13 @@ import { isValidMongoId } from '../service/utils/helper.js';
 
 // Create a post
 export const createPost = async (req, res, next) => {
+
     try {
         const { caption, feeling } = req.body;
         const user = req.user;
         const image = req.file;
 
-        if ( !(caption || image || feeling) ) {
+        if (!(caption || image || feeling)) {
             return userError(req, res, 400, 'Caption or image is required');
         }
 
@@ -20,6 +22,7 @@ export const createPost = async (req, res, next) => {
         if (image) {
             const res = await cloudinary.uploader.upload(image.path);
             uploadedImage = res
+            fs.unlinkSync(image.path);
         }
 
         const post = new Post({
@@ -62,7 +65,9 @@ export const getFollowingPosts = async (req, res, next) => {
     try {
         const user = req.user;
 
-        const posts = await Post.find({ author: { $in: user.following } }).populate('author', 'name profilePicture').exec();
+        const posts = await Post.find({ author: { $in: user.following } }).populate('author', 'name profilePicture')
+            .sort({ createdAt: -1 })
+            .exec();
 
         const resMessage = posts.length === 0 ? 'No posts found' : 'Posts retrieved successfully';
 
@@ -77,9 +82,9 @@ export const getFollowingPosts = async (req, res, next) => {
 export const getPostsByUserId = async (req, res, next) => {
     try {
         const userId = req.params.id;
-        if(!isValidMongoId(userId)) return userError(req, res, 400, 'Invalid user id');
+        if (!isValidMongoId(userId)) return userError(req, res, 400, 'Invalid user id');
 
-        const posts = await Post.find({ author: userId }).populate('author', 'name profilePicture').exec();
+        const posts = await Post.find({ author: userId }).populate('author', 'name profilePicture').sort({ createdAt: -1 }).exec();
 
         const resMessage = posts.length === 0 ? 'No posts found' : 'Posts retrieved successfully';
 
@@ -96,17 +101,17 @@ export const updatePost = async (req, res, next) => {
         const postId = req.params.id;
         const { caption, feeling } = req.body;
 
-        if(!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
+        if (!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
 
         const post = await Post.findById(postId);
 
         if (!post) return userError(req, res, 404, 'Post not found');
 
-        if(post.author.toString() !== req.user._id.toString()) {
+        if (post.author.toString() !== req.user._id.toString()) {
             return userError(req, res, 403, 'You are not authorized to update this post');
         }
 
-        if( !(caption || feeling ) ) return userError(req, res, 400, 'Caption or feeling is required');
+        if (!(caption || feeling)) return userError(req, res, 400, 'Caption or feeling is required');
 
         post.caption = caption || post.caption;
         post.feeling = feeling || post.feeling;
@@ -126,7 +131,7 @@ export const likePost = async (req, res, next) => {
         const postId = req.params.id;
         const user = req.user;
 
-        if(!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
+        if (!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
 
         const post = await Post.findById(postId);
 
@@ -153,7 +158,7 @@ export const unlikePost = async (req, res, next) => {
         const postId = req.params.id;
         const user = req.user;
 
-        if(!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
+        if (!isValidMongoId(postId)) return userError(req, res, 400, 'Invalid post id');
 
         const post = await Post.findById(postId);
 
