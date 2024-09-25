@@ -6,6 +6,7 @@ import authRoute from './auth.route.js';
 import commentRoute from './comment.route.js';
 import postRoute from './post.route.js';
 import messageRoute from './message.route.js';
+import conversationRoute from './conversation.route.js';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.use("/v1", authenticateToken, [
     commentRoute,
     postRoute,
     messageRoute,
+    conversationRoute
 ])
 
 

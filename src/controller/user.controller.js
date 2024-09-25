@@ -5,6 +5,7 @@ import { cloudinary } from '../config/cloudinaryConfig.js'
 import { isValidMongoId } from "../service/utils/helper.js";
 import userError from "../utils/userError.js";
 import { User } from "../model/user.model.js";
+import Conversation from '../model/conversation.model.js';
 
 // get user by id
 export const getUserbyId = async (req, res, next) => {
@@ -117,6 +118,24 @@ export const followUser = async (req, res, next) => {
         const me = await User.findById(myId);
         me.following.push(id);
         await me.save();
+
+        if (user.following.includes(myId)) {
+            // Check if a conversation between these two users already exists
+            const existingConversation = await Conversation.findOne({
+                participants: { $all: [myId, id], $size: 2 },
+                isGroupChat: false
+            });
+
+            if (!existingConversation) {
+                // Create a new conversation
+                const conversation = new Conversation({
+                    participants: [myId, id],
+                    isGroupChat: false,
+                    creator: myId
+                });
+                await conversation.save();
+            }
+        }
 
         return httpResponse(req, res, 200, user, 'User followed successfully');
 

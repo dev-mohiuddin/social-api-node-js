@@ -40,7 +40,6 @@ export const createPost = async (req, res, next) => {
 
         return httpResponse(req, res, 201, newPost, 'Post created successfully');
     } catch (error) {
-        console.log(error);
         httpError(next, error, req);
     }
 };
@@ -64,14 +63,45 @@ export const getPosts = async (req, res, next) => {
 export const getFollowingPosts = async (req, res, next) => {
     try {
         const user = req.user;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 200;
+        const skip = (page - 1) * limit;
 
-        const posts = await Post.find({ author: { $in: user.following } }).populate('author', 'name profilePicture')
-            .sort({ createdAt: -1 })
-            .exec();
+        const posts = await Post.aggregate([
+            { $match: { author: { $in: user.following } } },
+            { $sample: { size: limit } },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'author',
+                    foreignField: '_id',
+                    as: 'author'
+                }
+            },
+            { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
+            { $match: { author: { $ne: null } } },
+            { $project: { 'author.password': 0 } }
+        ]);
+
+        const totalPosts = await Post.countDocuments({ author: { $in: user.following } });
+        const totalPages = Math.ceil(totalPosts / limit);
+
+        const resData = {
+            posts,
+            totalPosts,
+            totalPages,
+            currentPage: page,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+            nextPage: page + 1,
+            prevPage: page - 1,
+        }
 
         const resMessage = posts.length === 0 ? 'No posts found' : 'Posts retrieved successfully';
 
-        return httpResponse(req, res, 200, posts, resMessage);
+        return httpResponse(req, res, 200, resData, resMessage);
 
     } catch (error) {
         httpError(next, error, req);
@@ -82,13 +112,31 @@ export const getFollowingPosts = async (req, res, next) => {
 export const getPostsByUserId = async (req, res, next) => {
     try {
         const userId = req.params.id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit; 
+
         if (!isValidMongoId(userId)) return userError(req, res, 400, 'Invalid user id');
 
-        const posts = await Post.find({ author: userId }).populate('author', 'name profilePicture').sort({ createdAt: -1 }).exec();
+        const posts = await Post.find({ author: userId }).populate('author', 'name profilePicture').sort({ createdAt: -1 }).skip(skip).limit(limit).exec();
+
+        const totalPosts = await Post.countDocuments({ author: userId });
+        const totalPages = Math.ceil(totalPosts / limit);
+
+        const resData = {
+            posts,
+            totalPosts,
+            totalPages,
+            currentPage: page,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+            nextPage: page + 1,
+            prevPage: page - 1,
+        }
+    
 
         const resMessage = posts.length === 0 ? 'No posts found' : 'Posts retrieved successfully';
-
-        return httpResponse(req, res, 200, posts, resMessage);
+        return httpResponse(req, res, 200, resData, resMessage);
 
     } catch (error) {
         httpError(next, error, req);
